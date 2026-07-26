@@ -1,0 +1,86 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /www/docker/medusa/data/postgres:/var/lib/postgresql/data
+    networks:
+      - medusa_internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - /www/docker/medusa/data/redis:/data
+    networks:
+      - medusa_internal
+
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    env_file: .env
+    ports:
+      - "127.0.0.1:9002:9000"
+      - "127.0.0.1:9003:9001"
+    volumes:
+      - /www/docker/medusa/data/minio:/data
+    networks:
+      - medusa_internal
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    env_file: .env
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set storage http://minio:9000
+      $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do sleep 2; done;
+      mc mb --ignore-existing storage/medusa;
+      mc anonymous set download storage/medusa;
+      "
+    networks:
+      - medusa_internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      MEDUSA_WORKER_MODE: server
+      DISABLE_MEDUSA_ADMIN: "false"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    ports:
+      - "127.0.0.1:9000:9000"
+    networks:
+      - medusa_internal
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      MEDUSA_WORKER_MODE: worker
+      DISABLE_MEDUSA_ADMIN: "true"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    networks:
+      - medusa_internal
+
+networks:
+  medusa_internal:
+    driver: bridge
