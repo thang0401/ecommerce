@@ -7,20 +7,16 @@ COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 RUN pnpm --filter @dtc/backend build
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm --filter @dtc/backend --prod deploy --legacy /prod/backend
 
 FROM node:20-alpine AS runtime
 
 RUN corepack enable && corepack prepare pnpm@10.11.1 --activate
 WORKDIR /app
 
+COPY --from=builder /prod/backend/node_modules ./node_modules
 COPY --from=builder /server/apps/backend/.medusa/server ./
-
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --prod --no-frozen-lockfile \
-      --network-concurrency=4 \
-      --fetch-retries=5 \
-      --fetch-retry-mintimeout=20000 \
-      --fetch-retry-maxtimeout=120000
 
 ENV NODE_ENV=production
 EXPOSE 9000
