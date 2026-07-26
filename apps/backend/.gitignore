@@ -4,13 +4,14 @@
 /uploads
 /node_modules
 yarn-error.log
-
+.env.production
 .idea
-
+.env.template
 coverage
-
+database dump
 !src/**
-
+MinIO data
+PostgreSQL data
 ./tsconfig.tsbuildinfo
 medusa-db.sql
 build
