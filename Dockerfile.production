@@ -7,18 +7,13 @@ COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 RUN pnpm --filter @dtc/backend build
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm --filter @dtc/backend --prod deploy --legacy /prod/backend
 
-FROM node:20-alpine AS runtime
+FROM builder AS runtime
 
-RUN corepack enable && corepack prepare pnpm@10.11.1 --activate
-WORKDIR /app
-
-COPY --from=builder /prod/backend/node_modules ./node_modules
-COPY --from=builder /server/apps/backend/.medusa/server ./
+WORKDIR /server/apps/backend/.medusa/server
 
 ENV NODE_ENV=production
+ENV PATH="/server/apps/backend/node_modules/.bin:/server/node_modules/.bin:${PATH}"
 EXPOSE 9000
 
 CMD ["pnpm", "start"]
